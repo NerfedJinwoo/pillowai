@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pillow AI</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root{
+      --bg-primary:#0f0f0f;--bg-secondary:#1a1a1a;--bg-tertiary:#2a2a2a;--border-color:#333;
+      --text-primary:#fff;--text-secondary:#ccc;--text-muted:#888;
+      --accent-color:#667eea;--accent-hover:#5a6fd8;--success-color:#10b981;--error-color:#ef4444;
+    }
+    [data-theme="light"]{
+      --bg-primary:#fff;--bg-secondary:#f8f9fa;--bg-tertiary:#e9ecef;--border-color:#dee2e6;
+      --text-primary:#212529;--text-secondary:#495057;--text-muted:#6c757d;
+      --accent-color:#0066cc;--accent-hover:#0052a3;--success-color:#198754;--error-color:#dc3545;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg-primary);color:var(--text-primary);height:100vh;overflow:hidden;transition:background-color .3s,color .3s}
+    .app-container{display:flex;height:100vh;position:relative}
+    .mobile-menu-btn{display:none;position:fixed;top:20px;left:20px;background:var(--bg-secondary);border:1px solid var(--border-color);color:var(--text-primary);padding:12px;border-radius:8px;cursor:pointer;z-index:1001;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+    .sidebar{width:280px;background:var(--bg-secondary);border-right:1px solid var(--border-color);display:flex;flex-direction:column;transition:all .3s;position:relative;z-index:100}
+    .sidebar.collapsed{width:60px}
+    .sidebar-header{padding:20px;border-bottom:1px solid var(--border-color);display:flex;align-items:center;gap:12px}
+    .logo{width:32px;height:32px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:18px;color:#fff}
+    .logo-text{font-size:20px;font-weight:600;transition:opacity .3s}
+    .sidebar.collapsed .logo-text{opacity:0;display:none}
+    .sidebar-actions{padding:20px;display:flex;flex-direction:column;gap:12px}
+    .new-chat-btn,.generate-image-btn{background:var(--bg-tertiary);border:1px solid var(--border-color);color:var(--text-primary);padding:12px 16px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .2s;font-size:14px}
+    .new-chat-btn:hover,.generate-image-btn:hover{background:var(--accent-color);border-color:var(--accent-color);color:#fff}
+    .generate-image-btn{background:var(--success-color);border-color:var(--success-color);color:#fff}
+    .generate-image-btn:hover{opacity:.9}
+    .sidebar.collapsed .new-chat-btn,.sidebar.collapsed .generate-image-btn{padding:12px;justify-content:center}
+    .sidebar.collapsed .new-chat-btn span,.sidebar.collapsed .generate-image-btn span{display:none}
+    .toggle-sidebar{position:absolute;top:20px;right:-15px;background:var(--bg-secondary);border:1px solid var(--border-color);color:var(--text-primary);width:30px;height:30px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+    .chat-history{flex:1;overflow-y:auto;padding:0 20px}
+    .sidebar.collapsed .chat-history{padding:0 10px}
+    .chat-item{padding:12px 16px;margin:4px 0;border-radius:8px;cursor:pointer;transition:background .2s;display:flex;align-items:center;gap:8px;position:relative}
+    .chat-item:hover{background:var(--bg-tertiary)}
+    .chat-item.active{background:var(--accent-color);color:#fff}
+    .chat-item-actions{margin-left:auto;opacity:0;transition:opacity .2s}
+    .chat-item:hover .chat-item-actions{opacity:1}
+    .delete-chat-btn{background:none;border:none;color:var(--error-color);cursor:pointer;padding:4px;border-radius:4px}
+    .delete-chat-btn:hover{background:var(--error-color);color:#fff}
+    .sidebar.collapsed .chat-item{padding:12px;justify-content:center}
+    .sidebar.collapsed .chat-item span,.sidebar.collapsed .chat-item-actions{display:none}
+    .sidebar-footer{padding:20px;border-top:1px solid var(--border-color)}
+    .settings-btn{background:none;border:none;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:8px;padding:8px;width:100%;text-align:left;border-radius:8px;transition:all .2s}
+    .settings-btn:hover{color:var(--text-primary);background:var(--bg-tertiary)}
+    .sidebar.collapsed .settings-btn{justify-content:center}
+    .sidebar.collapsed .settings-btn span{display:none}
+    .main-content{flex:1;display:flex;flex-direction:column;position:relative}
+    .chat-header{padding:20px;border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;background:var(--bg-primary)}
+    .model-info{display:flex;align-items:center;gap:8px;color:var(--text-secondary)}
+    .mode-selector{display:flex;gap:8px;align-items:center}
+    .mode-btn{padding:8px 16px;background:var(--bg-secondary);border:1px solid var(--border-color);color:var(--text-secondary);border-radius:20px;cursor:pointer;font-size:12px;transition:all .2s}
+    .mode-btn.active{background:var(--accent-color);border-color:var(--accent-color);color:#fff}
+    .chat-container{flex:1;overflow-y:auto;padding:20px;scroll-behavior:smooth}
+    .message{margin-bottom:24px;display:flex;gap:12px}
+    .message-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0}
+    .user-avatar{background:var(--accent-color);color:#fff}
+    .ai-avatar{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff}
+    .message-content{flex:1;line-height:1.6}
+    .message-text{background:var(--bg-secondary);padding:16px;border-radius:12px;border:1px solid var(--border-color);white-space:pre-wrap}
+    .user-message .message-text{background:var(--bg-tertiary);margin-left:auto;max-width:80%}
+    .thinking{color:var(--text-muted);font-style:italic;margin-bottom:12px}
+    .input-container{padding:20px;border-top:1px solid var(--border-color);background:var(--bg-primary)}
+    .input-wrapper{position:relative;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:12px;padding:12px 50px 12px 16px;display:flex;align-items:flex-end;gap:12px;transition:border-color .2s}
+    .input-wrapper:focus-within{border-color:var(--accent-color)}
+    .message-input{background:none;border:none;color:var(--text-primary);font-size:16px;line-height:1.5;resize:none;outline:none;flex:1;max-height:120px;min-height:24px}
+    .message-input::placeholder{color:var(--text-muted)}
+    .input-actions{display:flex;gap:8px;align-items:center}
+    .attach-btn,.send-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:6px;border-radius:6px;transition:all .2s}
+    .attach-btn:hover{background:var(--bg-tertiary);color:var(--text-secondary)}
+    .send-btn{color:var(--accent-color)}
+    .send-btn:hover{background:rgba(102,126,234,.1);color:var(--accent-hover)}
+    .send-btn:disabled{color:var(--text-muted);cursor:not-allowed}
+    .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);z-index:1000;justify-content:center;align-items:center}
+    .modal.show{display:flex}
+    .modal-content{background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:12px;padding:24px;max-width:520px;width:90%;max-height:80vh;overflow-y:auto}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+    .modal-title{font-size:18px;font-weight:600}
+    .close-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:20px;padding:4px}
+    .close-btn:hover{color:var(--text-primary)}
+    .settings-section{margin-bottom:24px}
+    .settings-section h3{font-size:16px;margin-bottom:16px;color:var(--text-primary);border-bottom:1px solid var(--border-color);padding-bottom:8px}
+    .form-group{margin-bottom:16px}
+    .form-label{display:block;margin-bottom:8px;color:var(--text-secondary);font-size:14px}
+    .form-input,.form-select{width:100%;padding:12px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px}
+    .form-input:focus,.form-select:focus{outline:none;border-color:var(--accent-color)}
+    .toggle-switch{position:relative;display:inline-block;width:50px;height:24px}
+    .toggle-switch input{opacity:0;width:0;height:0}
+    .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:var(--border-color);transition:.4s;border-radius:24px}
+    .slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background-color:#fff;transition:.4s;border-radius:50%}
+    input:checked + .slider{background-color:var(--accent-color)}
+    input:checked + .slider:before{transform:translateX(26px)}
+    .save-btn{background:var(--accent-color);color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:14px;transition:background-color .2s}
+    .save-btn:hover{background:var(--accent-hover)}
+    .image-preview{max-width:300px;max-height:200px;border-radius:8px;margin:8px 0}
+    .generated-image{max-width:100%;border-radius:12px;margin:12px 0;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+    .input-image-preview{display:flex;align-items:center;gap:8px;margin:8px 0}
+    .loading{display:inline-flex;align-items:center;gap:8px}
+    .spinner{width:16px;height:16px;border:2px solid var(--border-color);border-top:2px solid var(--accent-color);border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+    .image-gen-form{display:flex;flex-direction:column;gap:16px}
+    .prompt-input{min-height:100px;resize:vertical}
+    .generate-btn{background:var(--success-color);color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px;justify-content:center}
+    .generate-btn:hover{opacity:.9}
+    .generate-btn:disabled{opacity:.5;cursor:not-allowed}
+    @media (max-width:768px){
+      .mobile-menu-btn{display:block}
+      .sidebar{position:fixed;left:-280px;z-index:1000;height:100vh;box-shadow:2px 0 8px rgba(0,0,0,.15)}
+      .sidebar.open{left:0}
+      .sidebar.collapsed{width:280px;left:-280px}
+      .sidebar.collapsed.open{left:0}
+      .toggle-sidebar{display:none}
+      .main-content{width:100%}
+      .mode-selector{display:none}
+    }
+    .sidebar-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999;display:none}
+    .sidebar-overlay.show{display:block}
+    .banner{background:rgba(255,193,7,.12);border:1px dashed rgba(255,193,7,.6);color:var(--text-secondary);font-size:12px;padding:10px;border-radius:8px;margin-top:12px}
+    .tiny{font-size:12px;color:var(--text-muted)}
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Mobile menu button -->
+    <button class="mobile-menu-btn" onclick="toggleMobileSidebar()">
+      <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Sidebar overlay for mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileSidebar()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <button class="toggle-sidebar" onclick="toggleSidebar()">
+        <i class="fas fa-chevron-left" id="toggle-icon"></i>
+      </button>
+
+      <div class="sidebar-header">
+        <div class="logo">P</div>
+        <div class="logo-text">Pillow AI</div>
+      </div>
+
+      <div class="sidebar-actions">
+        <button class="new-chat-btn" onclick="startNewChat()">
+          <i class="fas fa-plus"></i><span>New Chat</span>
+        </button>
+        <button class="generate-image-btn" onclick="openImageGenerator()">
+          <i class="fas fa-image"></i><span>Generate Image</span>
+        </button>
+      </div>
+
+      <div class="chat-history" id="chatHistory"></div>
+
+      <div class="sidebar-footer">
+        <button class="settings-btn" onclick="openSettings()">
+          <i class="fas fa-cog"></i><span>Settings</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="main-content">
+      <div class="chat-header">
+        <div class="model-info">
+          <i class="fas fa-robot"></i>
+          <span id="currentModel">DeepSeek-R1 via OpenRouter</span>
+        </div>
+        <div class="mode-selector">
+          <button class="mode-btn active" data-mode="chat" onclick="switchMode('chat')">
+            <i class="fas fa-comments"></i> Chat
+          </button>
+          <button class="mode-btn" data-mode="image" onclick="switchMode('image')">
+            <i class="fas fa-image"></i> Image
+          </button>
+        </div>
+      </div>
+
+      <div class="chat-container" id="chatContainer">
+        <div class="message">
+          <div class="message-avatar ai-avatar">P</div>
+          <div class="message-content">
+            <div class="message-text">
+              Hello! I'm Pillow AI, powered by DeepSeek-R1. I can help with chat, analysis, and more. Use the paperclip to attach an image for vision-capable models, or tap “Generate Image” to create artwork with DALL·E 3.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="input-container">
+        <div class="input-wrapper">
+          <textarea class="message-input" id="messageInput" placeholder="Type your message here..." rows="1" onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
+          <div class="input-actions">
+            <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+            <button class="attach-btn" onclick="document.getElementById('fileInput').click()">
+              <i class="fas fa-paperclip"></i>
+            </button>
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+              <i class="fas fa-paper-plane"></i>
+            </button>
+          </div>
+        </div>
+        <div id="attachPreview" class="input-image-preview" style="display:none;">
+          <img id="attachedThumb" class="image-preview" alt="Attached"/>
+          <button class="attach-btn" onclick="clearAttachment()" title="Remove"><i class="fas fa-times"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal" id="settingsModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">Settings</div>
+        <button class="close-btn" onclick="closeSettings()">&times;</button>
+      </div>
+
+      <div class="settings-section">
+        <h3>API Configuration</h3>
+        <div class="form-group">
+          <label class="form-label">OpenRouter API Key</label>
+          <input type="password" class="form-input" id="apiKeyInput" placeholder="Enter your OpenRouter API key">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Chat Model</label>
+          <select class="form-select" id="chatModelSelect">
+            <option value="deepseek/deepseek-r1">DeepSeek R1</option>
+            <option value="deepseek/deepseek-chat">DeepSeek Chat</option>
+            <option value="openai/gpt-4o">GPT-4o (vision)</option>
+            <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+            <option value="meta-llama/llama-3.2-11b-vision-instruct:free">Llama 3.2 Vision (free)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Image Generation Model</label>
+          <select class="form-select" id="imageModelSelect">
+            <option value="openai/dall-e-3">DALL·E 3 (OpenAI)</option>
+            <option value="black-forest-labs/flux-1.1-pro">FLUX 1.1 Pro (provider-specific)</option>
+            <option value="black-forest-labs/flux-pro">FLUX Pro (provider-specific)</option>
+            <option value="stability-ai/stable-diffusion-3.5-large">Stable Diffusion 3.5 (provider-specific)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">OpenAI API Key (only for DALL·E 3)</label>
+          <input type="password" class="form-input" id="openaiKeyInput" placeholder="Optional: Needed for DALL·E 3 image generation">
+        </div>
+        <div class="banner">
+          Heads up: Front-end apps cannot fully hide API keys. For production, send requests through a small backend proxy to keep keys secret.
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Appearance</h3>
+        <div class="form-group">
+          <label class="form-label">Theme</label>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span>Light</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+              <span class="slider"></span>
+            </label>
+            <span>Dark</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Font Size</label>
+          <select class="form-select" id="fontSizeSelect">
+            <option value="small">Small</option>
+            <option value="medium" selected>Medium</option>
+            <option value="large">Large</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Chat Behavior</h3>
+        <div class="form-group">
+          <label class="form-label">Temperature <span class="tiny">(0 = focused, 1 = creative)</span></label>
+          <input type="range" class="form-input" id="temperatureSlider" min="0" max="1" step="0.1" value="0.7" oninput="document.getElementById('temperatureValue').textContent=this.value">
+          <small style="color:var(--text-muted);">Current: <span id="temperatureValue">0.7</span></small>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Max Tokens</label>
+          <input type="number" class="form-input" id="maxTokensInput" value="4000" min="100" max="8000">
+        </div>
+      </div>
+
+      <button type="button" class="save-btn" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+
+  <!-- Image Generator Modal -->
+  <div class="modal" id="imageGenModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">Generate Image</div>
+        <button class="close-btn" onclick="closeImageGenerator()">&times;</button>
+      </div>
+      <form class="image-gen-form" onsubmit="generateImage(event)">
+        <div class="form-group">
+          <label class="form-label">Image Description</label>
+          <textarea class="form-input prompt-input" id="imagePromptInput" placeholder="Describe the image you want to generate..." required></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Size</label>
+          <select class="form-select" id="imageSizeSelect">
+            <option value="1024x1024">Square (1024x1024)</option>
+            <option value="1024x1792">Portrait (1024x1792)</option>
+            <option value="1792x1024">Landscape (1792x1024)</option>
+          </select>
+        </div>
+        <button type="submit" class="generate-btn" id="generateBtn">
+          <i class="fas fa-magic"></i> Generate Image
+        </button>
+        <div id="imgGenNote" class="tiny" style="margin-top:8px;color:var(--text-secondary);">
+          Image gen uses OpenAI’s DALL·E 3 when an OpenAI key is provided. Other models may require provider-specific APIs via a backend.
+        </div>
+      </form>
+      <div id="generatedImageWrap"></div>
+    </div>
+  </div>
+
+  <script>
+    // ---------------- Global State ----------------
+    let currentChatId = null;
+    let chats = JSON.parse(localStorage.getItem('pillowai_chats')) || {};
+    let settings = JSON.parse(localStorage.getItem('pillowai_settings')) || {
+      apiKey: '',
+      openaiKey: '',
+      chatModel: 'deepseek/deepseek-r1',
+      imageModel: 'openai/dall-e-3',
+      theme: 'dark',
+      fontSize: 'medium',
+      temperature: 0.7,
+      maxTokens: 4000
+    };
+    let selectedImage = null; // { mime, dataUrl, base64 }
+    let currentMode = 'chat';
+
+    // ---------------- Init ----------------
+    document.addEventListener('DOMContentLoaded', () => {
+      loadChatHistory();
+      loadSettings();
+      applySettings();
+      if (Object.keys(chats).length === 0) {
+        startNewChat();
+      } else {
+        const lastChatId = Object.keys(chats)[Object.keys(chats).length - 1];
+        loadChat(lastChatId);
+      }
+    });
+
+    // ---------------- Settings & Theme ----------------
+    function applySettings(){
+      document.documentElement.setAttribute('data-theme', settings.theme);
+      document.getElementById('themeToggle').checked = settings.theme === 'dark';
+      document.body.style.fontSize = settings.fontSize === 'small' ? '14px' : settings.fontSize === 'large' ? '18px' : '16px';
+      document.getElementById('currentModel').textContent =
+        (settings.chatModel || 'deepseek/deepseek-r1') + ' via OpenRouter';
+    }
+
+    function loadSettings(){
+      document.getElementById('apiKeyInput').value = settings.apiKey || '';
+      document.getElementById('openaiKeyInput').value = settings.openaiKey || '';
+      document.getElementById('chatModelSelect').value = settings.chatModel || 'deepseek/deepseek-r1';
+      document.getElementById('imageModelSelect').value = settings.imageModel || 'openai/dall-e-3';
+      document.getElementById('fontSizeSelect').value = settings.fontSize || 'medium';
+      document.getElementById('temperatureSlider').value = settings.temperature ?? 0.7;
+      document.getElementById('temperatureValue').textContent = settings.temperature ?? 0.7;
+      document.getElementById('maxTokensInput').value = settings.maxTokens ?? 4000;
+      document.getElementById('themeToggle').checked = settings.theme === 'dark';
+    }
+
+    function saveSettings(){
+      settings.apiKey = document.getElementById('apiKeyInput').value.trim();
+      settings.openaiKey = document.getElementById('openaiKeyInput').value.trim();
+      settings.chatModel = document.getElementById('chatModelSelect').value;
+      settings.imageModel = document.getElementById('imageModelSelect').value;
+      settings.fontSize = document.getElementById('fontSizeSelect').value;
+      settings.temperature = parseFloat(document.getElementById('temperatureSlider').value);
+      settings.maxTokens = parseInt(document.getElementById('maxTokensInput').value, 10);
+      settings.theme = document.getElementById('themeToggle').checked ? 'dark' : 'light';
+      localStorage.setItem('pillowai_settings', JSON.stringify(settings));
+      applySettings();
+      closeSettings();
+    }
+
+    function toggleTheme(){
+      settings.theme = document.getElementById('themeToggle').checked ? 'dark' : 'light';
+      localStorage.setItem('pillowai_settings', JSON.stringify(settings));
+      applySettings();
+    }
+
+    function openSettings(){ document.getElementById('settingsModal').classList.add('show'); }
+    function closeSettings(){ document.getElementById('settingsModal').classList.remove('show'); }
+
+    // ---------------- Sidebar ----------------
+    function toggleSidebar(){
+      const sb = document.getElementById('sidebar');
+      sb.classList.toggle('collapsed');
+      document.getElementById('toggle-icon').classList.toggle('fa-chevron-right');
+      document.getElementById('toggle-icon').classList.toggle('fa-chevron-left');
+    }
+    function toggleMobileSidebar(){
+      document.getElementById('sidebar').classList.add('open');
+      document.getElementById('sidebarOverlay').classList.add('show');
+    }
+    function closeMobileSidebar(){
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebarOverlay').classList.remove('show');
+    }
+
+    // ---------------- Chats ----------------
+    function startNewChat(){
+      const id = 'chat_' + Date.now();
+      chats[id] = { id, title: 'New chat', messages: [] };
+      currentChatId = id;
+      localStorage.setItem('pillowai_chats', JSON.stringify(chats));
+      loadChatHistory();
+      renderChat();
+      addAIIntro();
+    }
+
+    function loadChatHistory(){
+      const container = document.getElementById('chatHistory');
+      container.innerHTML = '';
+      Object.values(chats).forEach(chat => {
+        const item = document.createElement('div');
+        item.className = 'chat-item' + (chat.id === currentChatId ? ' active' : '');
+        item.onclick = () => loadChat(chat.id);
+
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-message';
+        const title = document.createElement('span');
+        title.textContent = chat.title;
+
+        const actions = document.createElement('div');
+        actions.className = 'chat-item-actions';
+        const del = document.createElement('button');
+        del.className = 'delete-chat-btn';
+        del.innerHTML = '<i class="fas fa-trash"></i>';
+        del.onclick = (e)=>{ e.stopPropagation(); deleteChat(chat.id); };
+
+        actions.appendChild(del);
+        item.appendChild(icon); item.appendChild(title); item.appendChild(actions);
+        container.appendChild(item);
+      });
+    }
+
+    function deleteChat(id){
+      if (!confirm('Delete this chat?')) return;
+      delete chats[id];
+      localStorage.setItem('pillowai_chats', JSON.stringify(chats));
+      const ids = Object.keys(chats);
+      if (ids.length){ loadChat(ids[ids.length-1]); } else { startNewChat(); }
+      loadChatHistory();
+    }
+
+    function loadChat(id){
+      currentChatId = id;
+      renderChat();
+      loadChatHistory();
+      closeMobileSidebar();
+    }
+
+    function renderChat(){
+      const chat = chats[currentChatId];
+      const container = document.getElementById('chatContainer');
+      container.innerHTML = '';
+      (chat?.messages || []).forEach(msg => {
+        appendMessageToDOM(msg.role, msg.content, msg.imageDataUrl);
+      });
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function setChatTitleFromFirstUserMessage(){
+      const chat = chats[currentChatId];
+      if (!chat) return;
+      const firstUser = chat.messages.find(m => m.role === 'user' && m.content.trim());
+      if (firstUser){
+        chat.title = (firstUser.content.slice(0, 30) + (firstUser.content.length>30?'…':'')) || 'Chat';
+        localStorage.setItem('pillowai_chats', JSON.stringify(chats));
+        loadChatHistory();
+      }
+    }
+
+    function addAIIntro(){
+      const text = "Hi! I'm Pillow AI. Ask me anything, tweak settings from the sidebar, or attach an image for vision models.";
+      addMessage('assistant', text);
+    }
+
+    // ---------------- Messaging ----------------
+    function handleKeyDown(e){
+      if (e.key === 'Enter' && !e.shiftKey){
+        e.preventDefault();
+        sendMessage();
+      }
+    }
+    function autoResize(el){
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+    }
+
+    function addMessage(role, content, imageDataUrl=null){
+      const chat = chats[currentChatId];
+      if (!chat) return;
+      chat.messages.push({ role, content, imageDataUrl: imageDataUrl || null, ts: Date.now() });
+      localStorage.setItem('pillowai_chats', JSON.stringify(chats));
+      appendMessageToDOM(role, content, imageDataUrl);
+      if (role === 'user') setChatTitleFromFirstUserMessage();
+    }
+
+    function appendMessageToDOM(role, content, imageDataUrl){
+      const container = document.getElementById('chatContainer');
+      const message = document.createElement('div');
+      message.className = 'message ' + (role === 'user' ? 'user-message' : '');
+      const avatar = document.createElement('div');
+      avatar.className = 'message-avatar ' + (role === 'user' ? 'user-avatar' : 'ai-avatar');
+      avatar.textContent = role === 'user' ? 'U' : 'P';
+      const contentWrap = document.createElement('div');
+      contentWrap.className = 'message-content';
+
+      if (imageDataUrl){
+        const img = document.createElement('img');
+        img.src = imageDataUrl;
+        img.alt = 'attached';
+        img.className = 'image-preview';
+        contentWrap.appendChild(img);
+      }
+
+      const bubble = document.createElement('div');
+      bubble.className = 'message-text';
+      bubble.textContent = content;
+      contentWrap.appendChild(bubble);
+
+      message.appendChild(avatar); message.appendChild(contentWrap);
+      container.appendChild(message);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function sendMessage(){
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      if (!text && !selectedImage){ return; }
+      if (!settings.apiKey){
+        alert('Please add your OpenRouter API key in Settings.');
+        openSettings();
+        return;
+      }
+
+      addMessage('user', text || '(attached image)', selectedImage?.dataUrl || null);
+
+      // Show thinking placeholder
+      const thinking = document.createElement('div');
+      thinking.className = 'message';
+      thinking.innerHTML = `
+        <div class="message-avatar ai-avatar">P</div>
+        <div class="message-content"><div class="thinking">
+          <span class="spinner"></span> Thinking…
+        </div></div>`;
+      document.getElementById('chatContainer').appendChild(thinking);
+      document.getElementById('chatContainer').scrollTop = document.getElementById('chatContainer').scrollHeight;
+
+      try{
+        const reply = await callOpenRouterChat(text, selectedImage);
+        // Remove thinking and add assistant message
+        thinking.remove();
+        addMessage('assistant', reply || '(no response)');
+      }catch(err){
+        thinking.remove();
+        console.error(err);
+        addMessage('assistant', '⚠️ Error: ' + (err?.message || 'Failed to fetch response.'));
+      }finally{
+        input.value = '';
+        input.style.height = '24px';
+        clearAttachment();
+      }
+    }
+
+    // ---------------- File Attachment (Vision) ----------------
+    function handleFileSelect(e){
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        const base64 = dataUrl.split(',')[1];
+        selectedImage = { mime: file.type, dataUrl, base64 };
+        const prev = document.getElementById('attachPreview');
+        const thumb = document.getElementById('attachedThumb');
+        thumb.src = dataUrl;
+        prev.style.display = 'flex';
+      };
+      reader.readAsDataURL(file);
+    }
+    function clearAttachment(){
+      selectedImage = null;
+      document.getElementById('fileInput').value = '';
+      document.getElementById('attachPreview').style.display = 'none';
+    }
+
+    // ---------------- Mode Switch ----------------
+    function switchMode(mode){
+      currentMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelector(`.mode-btn[data-mode="${mode}"]`).classList.add('active');
+      if (mode === 'image'){ openImageGenerator(); }
+    }
+
+    // ---------------- Image Generation ----------------
+    function openImageGenerator(){ document.getElementById('imageGenModal').classList.add('show'); }
+    function closeImageGenerator(){ document.getElementById('imageGenModal').classList.remove('show'); }
+
+    async function generateImage(e){
+      e.preventDefault();
+      const prompt = document.getElementById('imagePromptInput').value.trim();
+      const size = document.getElementById('imageSizeSelect').value;
+      const model = settings.imageModel;
+      const btn = document.getElementById('generateBtn');
+      const out = document.getElementById('generatedImageWrap');
+      out.innerHTML = '';
+      if (!prompt) return;
+
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Generating…';
+
+      try{
+        if (model === 'openai/dall-e-3'){
+          if (!settings.openaiKey){
+            throw new Error('OpenAI API key required for DALL·E 3. Add it in Settings.');
+          }
+          const imgUrl = await callOpenAIImages(prompt, size);
+          const img = document.createElement('img');
+          img.src = imgUrl;
+          img.alt = 'Generated image';
+          img.className = 'generated-image';
+          out.appendChild(img);
+        }else{
+          // Graceful message for provider-specific models in this pure front-end demo
+          const note = document.createElement('div');
+          note.className = 'message-text';
+          note.style.marginTop = '12px';
+          note.textContent =
+            'This demo currently generates images with DALL·E 3 only (OpenAI key required). ' +
+            'Other models like FLUX or SD 3.5 usually require provider-specific APIs via a backend proxy.';
+          out.appendChild(note);
+        }
+      }catch(err){
+        const errBox = document.createElement('div');
+        errBox.className = 'message-text';
+        errBox.style.borderColor = 'var(--error-color)';
+        errBox.textContent = '⚠️ ' + (err?.message || 'Image generation failed.');
+        out.appendChild(errBox);
+      }finally{
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic"></i> Generate Image';
+      }
+    }
+
+    // ---------------- API Calls ----------------
+    async function callOpenRouterChat(userText, image){
+      // Build messages array; if image is attached and model supports vision, include it
+      const visionCapable = (settings.chatModel || '').includes('gpt-4o')
+        || (settings.chatModel || '').includes('vision')
+        || (settings.chatModel || '').includes('llama-3.2')
+        || (settings.chatModel || '').includes('gemini')
+        || (settings.chatModel || '').includes('omni');
+
+      const content = [];
+      if (userText){
+        content.push({ type: 'text', text: userText });
+      }
+      if (image){
+        if (!visionCapable){
+          // If current model isn't vision, add a helper line and still send text-only
+          content.push({ type: 'text', text: "\n(Note: An image was attached, but the current model may not support vision. Consider switching to a vision model like GPT-4o or Llama 3.2 Vision in Settings.)" });
+        }else{
+          content.push({
+            type: 'input_text', // keep text first per OpenRouter recommendation
+            text: userText || 'Please analyze the attached image.'
+          });
+          content.push({
+            type: 'image_url',
+            image_url: { url: image.dataUrl } // base64 data URL
+          });
+        }
+      }
+
+      const body = {
+        model: settings.chatModel || 'deepseek/deepseek-r1',
+        messages: [
+          { role: 'system', content: 'You are Pillow AI. Be concise, helpful, and friendly.' },
+          { role: 'user', content: content.length ? content : [{ type: 'text', text: userText || 'Hello' }] }
+        ],
+        temperature: settings.temperature ?? 0.7,
+        max_tokens: settings.maxTokens ?? 4000,
+        // Ask OpenRouter to include usage (optional)
+        usage: { include: true }
+      };
+
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + settings.apiKey,
+          'HTTP-Referer': location.origin,      // optional but recommended
+          'X-Title': 'Pillow AI',               // optional
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok){
+        const t = await res.text();
+        throw new Error('OpenRouter error ' + res.status + ': ' + t);
+      }
+      const data = await res.json();
+      const message = data?.choices?.[0]?.message?.content || '';
+      return typeof message === 'string' ? message : (Array.isArray(message) ? message.map(p => p.text || '').join('\n') : '');
+    }
+
+    async function callOpenAIImages(prompt, size){
+      // DALL·E 3 images generation
+      const res = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + settings.openaiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'dall-e-3',
+          prompt,
+          size,
+          quality: 'standard',
+          n: 1
+        })
+      });
+      if (!res.ok){
+        const t = await res.text();
+        throw new Error('OpenAI error ' + res.status + ': ' + t);
+      }
+      const data = await res.json();
+      const url = data?.data?.[0]?.url;
+      if (!url) throw new Error('No image URL returned.');
+      return url;
+    }
+
+    // ---------------- Utilities ----------------
+    function openImage(url){
+      const w = window.open();
+      w.document.write('<img src="'+url+'" style="max-width:100%"/>');
+    }
+  </script>
+</body>
+</html>
